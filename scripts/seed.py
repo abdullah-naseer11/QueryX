@@ -59,6 +59,8 @@ def main() -> None:
                  for oid in range(1, N_ORDERS + 1) for _ in range(random.randint(1, 3))]
         cur.executemany("INSERT INTO order_items (order_id, product_id, qty) VALUES (%s, %s, %s)", items)
 
+        cur.execute("ANALYZE")  # lets Postgres record row counts, which the schema reader shows
+
         for t in ("users", "products", "orders", "order_items"):
             cur.execute(f"SELECT count(*) FROM {t}")
             print(f"{t:12} {cur.fetchone()[0]} rows")
