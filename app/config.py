@@ -8,3 +8,7 @@ load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://app:app@localhost:5433/shop")
 # Read-only account: used by the schema reader. It cannot change or even read table rows.
 READONLY_DATABASE_URL = os.getenv("READONLY_DATABASE_URL", "postgresql://reader:reader@localhost:5433/shop")
+
+# Local AI (Ollama). Change the model name in .env to try a bigger model.
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5-coder:3b")
