@@ -2,11 +2,13 @@
   python -m app schema                 (database structure as text; add --json for full details)
   python -m app check "SQL here"       (safety check for SQL)
   python -m app check --file x.sql     (safety check for a file)
-  python -m app propose "request"      (AI writes a checked migration)"""
+  python -m app propose "request"      (AI writes a checked migration)
+  python -m app verify "UP SQL" "DOWN SQL"   (test a rollback; nothing is kept)"""
 import argparse
 import sys
 
 from app.db.connection import connect
+from app.db.rollback_check import verify_rollback
 from app.db.schema_reader import read_schema, to_prompt_text
 from app.llm.agent import join_sql, propose_migration
 from app.llm.client import OllamaClient
@@ -27,6 +29,10 @@ def main() -> None:
 
     p = sub.add_parser("propose", help="AI writes a migration from plain English")
     p.add_argument("request", help="what you want, in plain English")
+
+    v = sub.add_parser("verify", help="test that a rollback undoes a migration")
+    v.add_argument("up", help="migration SQL")
+    v.add_argument("down", help="rollback SQL")
 
     args = parser.parse_args()
 
@@ -59,6 +65,15 @@ def main() -> None:
             print(f"\nSAFETY: {result.report.verdict}")
             for r in result.report.results:
                 print(f"  [{r.severity}] {r.message}")
+
+    elif args.command == "verify":
+        with connect(readonly=False) as conn:  # needs permission to change; everything is cancelled at the end
+            result = verify_rollback(conn, args.up, args.down)
+        print(f"ROLLBACK CHECK: {result.status}\n{result.message}")
+        if not result.migration_diff.is_empty:
+            print("\nWhat the migration changed:\n" + result.migration_diff.text())
+        if not result.leftover_diff.is_empty:
+            print("\nWhat the rollback failed to undo:\n" + result.leftover_diff.text())
 
 
 if __name__ == "__main__":
