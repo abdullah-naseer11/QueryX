@@ -12,3 +12,6 @@ READONLY_DATABASE_URL = os.getenv("READONLY_DATABASE_URL", "postgresql://reader:
 # Local AI (Ollama). Change the model name in .env to try a bigger model.
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5-coder:3b")
+
+# Sandbox: a throw-away database in Docker, used to test migrations safely.
+SANDBOX_IMAGE = os.getenv("SANDBOX_IMAGE", "postgres:16")

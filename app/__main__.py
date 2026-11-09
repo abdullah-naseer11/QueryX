@@ -3,7 +3,8 @@
   python -m app check "SQL here"       (safety check for SQL)
   python -m app check --file x.sql     (safety check for a file)
   python -m app propose "request"      (AI writes a checked migration)
-  python -m app verify "UP SQL" "DOWN SQL"   (test a rollback; nothing is kept)"""
+  python -m app verify "UP SQL" "DOWN SQL"   (test a rollback; nothing is kept)
+  python -m app dryrun "UP SQL" "DOWN SQL"  (test in a throw-away Docker database)"""
 import argparse
 import sys
 
@@ -13,6 +14,7 @@ from app.db.schema_reader import read_schema, to_prompt_text
 from app.llm.agent import join_sql, propose_migration
 from app.llm.client import OllamaClient
 from app.safety.checker import check_sql
+from app.sandbox.runner import dry_run
 
 
 def main() -> None:
@@ -33,6 +35,10 @@ def main() -> None:
     v = sub.add_parser("verify", help="test that a rollback undoes a migration")
     v.add_argument("up", help="migration SQL")
     v.add_argument("down", help="rollback SQL")
+
+    d = sub.add_parser("dryrun", help="test a migration and rollback in a throw-away Docker database")
+    d.add_argument("up", help="migration SQL")
+    d.add_argument("down", help="rollback SQL")
 
     args = parser.parse_args()
 
@@ -74,6 +80,22 @@ def main() -> None:
             print("\nWhat the migration changed:\n" + result.migration_diff.text())
         if not result.leftover_diff.is_empty:
             print("\nWhat the rollback failed to undo:\n" + result.leftover_diff.text())
+
+    elif args.command == "dryrun":
+        print("Starting the sandbox (first time can take a minute)...")
+        try:
+            r = dry_run(args.up, args.down)
+        except RuntimeError as e:
+            sys.exit(str(e))
+        print(f"\nSANDBOX: {r.status}\n{r.message}")
+        if r.error_at:
+            print(f"(failed at: {r.error_at})")
+        print(f"Migration took {r.up_seconds}s, rollback took {r.down_seconds}s")
+        if not r.migration_diff.is_empty:
+            print("\nWhat the migration changed:\n" + r.migration_diff.text())
+        if not r.leftover_diff.is_empty:
+            print("\nWhat the rollback failed to undo:\n" + r.leftover_diff.text())
+        print("\nNote: " + r.note)
 
 
 if __name__ == "__main__":
