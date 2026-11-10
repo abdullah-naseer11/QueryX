@@ -31,6 +31,26 @@ CREATE TABLE IF NOT EXISTS dbarch.audit_log (
     detail text NOT NULL DEFAULT '',
     at timestamptz NOT NULL DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS dbarch.backfills (
+    id bigserial PRIMARY KEY,
+    request text NOT NULL,
+    summary text NOT NULL DEFAULT '',
+    table_name text NOT NULL,
+    key_column text NOT NULL,
+    set_clause text NOT NULL,
+    where_clause text NOT NULL,
+    batch_size int NOT NULL,
+    status text NOT NULL,
+    min_key bigint,
+    max_key bigint,
+    last_key bigint,
+    rows_to_update bigint NOT NULL DEFAULT 0,
+    rows_updated bigint NOT NULL DEFAULT 0,
+    error text,
+    created_by text,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+);
 """
 
 EDITABLE = {"error", "sandbox_status", "approved_by"}
