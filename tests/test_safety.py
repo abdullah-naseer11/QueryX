@@ -14,6 +14,8 @@ CATCH = [
     ("DROP TABLE users", "drop_table", "BLOCK"),
     ("drop table if exists users cascade", "drop_table", "BLOCK"),
     ("DROP   TABLE\n  users;", "drop_table", "BLOCK"),
+    ("UPDATE users SET name = '' WHERE true", "update_without_where", "BLOCK"),
+    ("DELETE FROM users WHERE 1 = 1", "delete_without_where", "BLOCK"),
     ("DROP SCHEMA public CASCADE", "drop_schema", "BLOCK"),
     ("DROP DATABASE shop", "drop_database", "BLOCK"),
     ("TRUNCATE users", "truncate", "BLOCK"),
@@ -54,6 +56,7 @@ SAFE = [
     "DELETE FROM users WHERE id = 5",
     "UPDATE users SET name = 'x' WHERE id = 5",
     "SELECT * FROM users",
+    "UPDATE users SET name = 'x' WHERE 1 = 2",
 ]
 
 

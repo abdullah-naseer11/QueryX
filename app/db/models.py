@@ -23,12 +23,18 @@ class Index(BaseModel):
     definition: str
 
 
+class CheckConstraint(BaseModel):
+    name: str
+    definition: str
+
+
 class Table(BaseModel):
     name: str
     columns: list[Column]
     primary_key: list[str] = []
     unique_constraints: list[list[str]] = []
     foreign_keys: list[ForeignKey] = []
+    check_constraints: list[CheckConstraint] = []
     indexes: list[Index] = []
     estimated_rows: int | None = None  # None = Postgres has not counted yet
 

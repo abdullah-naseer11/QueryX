@@ -59,3 +59,17 @@ def test_reader_cannot_change_anything():
     with connect(readonly=True) as conn:
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             conn.execute("CREATE TABLE hacked (id int)")
+
+
+def test_check_constraints_are_read():
+    from app.db.connection import connect
+    with connect(readonly=False) as conn:
+        with conn.transaction(force_rollback=True):
+            conn.execute("ALTER TABLE products ADD CONSTRAINT price_ok CHECK (price >= 0) NOT VALID")
+            ck = read_schema(conn).table("products").check_constraints
+    assert [c.name for c in ck] == ["price_ok"] and "NOT VALID" in ck[0].definition
+
+
+def test_auto_number_columns_are_shown_as_bigserial(snap):
+    text = to_prompt_text(snap)
+    assert "id bigserial" in text and "nextval" not in text

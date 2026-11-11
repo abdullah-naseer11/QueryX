@@ -56,6 +56,16 @@ def _diff_table(name: str, a: Table, b: Table) -> list[Change]:
     for n in fa.keys() - fb.keys():
         out.append(Change(kind="foreign_key_removed", table=name, detail=n))
 
+    ka = {c.name: c.definition for c in a.check_constraints}
+    kb = {c.name: c.definition for c in b.check_constraints}
+    for n in kb.keys() - ka.keys():
+        out.append(Change(kind="check_added", table=name, detail=f"{n} {kb[n]}"))
+    for n in ka.keys() - kb.keys():
+        out.append(Change(kind="check_removed", table=name, detail=n))
+    for n in ka.keys() & kb.keys():
+        if ka[n] != kb[n]:
+            out.append(Change(kind="check_changed", table=name, detail=f"{n}: {ka[n]} -> {kb[n]}"))
+
     if a.primary_key != b.primary_key:
         out.append(Change(kind="primary_key_changed", table=name, detail=f"{a.primary_key} -> {b.primary_key}"))
     if sorted(a.unique_constraints) != sorted(b.unique_constraints):

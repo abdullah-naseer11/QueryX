@@ -1,4 +1,4 @@
-from app.db.models import Column, ForeignKey, Index, SchemaSnapshot, Table
+from app.db.models import CheckConstraint, Column, ForeignKey, Index, SchemaSnapshot, Table
 from app.db.schema_diff import diff_schemas
 
 
@@ -6,9 +6,9 @@ def snap(*tables: Table) -> SchemaSnapshot:
     return SchemaSnapshot(schema_name="public", server_version="16", tables=list(tables))
 
 
-def users(*extra_cols: Column, indexes=(), fks=()) -> Table:
+def users(*extra_cols: Column, indexes=(), fks=(), checks=()) -> Table:
     cols = [Column(name="id", data_type="bigint", nullable=False)] + list(extra_cols)
-    return Table(name="users", columns=cols, primary_key=["id"], indexes=list(indexes), foreign_keys=list(fks))
+    return Table(name="users", columns=cols, primary_key=["id"], indexes=list(indexes), foreign_keys=list(fks), check_constraints=list(checks))
 
 
 def kinds(a, b) -> list[str]:
@@ -69,3 +69,9 @@ def test_row_estimates_are_ignored():
 def test_text_output_is_readable():
     after = snap(users(Column(name="tier", data_type="text", nullable=True)))
     assert diff_schemas(snap(users()), after).text() == "+ column users: tier text"
+
+
+def test_check_constraint_added_and_removed():
+    ck = CheckConstraint(name="ck1", definition="CHECK ((id > 0))")
+    assert kinds(snap(users()), snap(users(checks=[ck]))) == ["check_added"]
+    assert kinds(snap(users(checks=[ck])), snap(users())) == ["check_removed"]

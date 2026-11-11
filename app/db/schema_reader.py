@@ -3,7 +3,7 @@ The catalogs are used (not information_schema) because they show structure even 
 an account that has no permission to read the table rows."""
 import psycopg
 
-from app.db.models import Column, ForeignKey, Index, SchemaSnapshot, Table
+from app.db.models import CheckConstraint, Column, ForeignKey, Index, SchemaSnapshot, Table
 
 COLUMNS_SQL = """
 SELECT c.relname AS table_name, a.attname AS name,
@@ -20,6 +20,7 @@ ORDER BY c.relname, a.attnum
 
 CONSTRAINTS_SQL = """
 SELECT con.conname AS name, con.contype AS kind, rel.relname AS table_name,
+  pg_get_constraintdef(con.oid) AS definition,
   (SELECT array_agg(a.attname ORDER BY k.ord)
      FROM unnest(con.conkey) WITH ORDINALITY k(attnum, ord)
      JOIN pg_attribute a ON a.attrelid = con.conrelid AND a.attnum = k.attnum) AS cols,
@@ -31,7 +32,7 @@ FROM pg_constraint con
 JOIN pg_class rel ON rel.oid = con.conrelid
 JOIN pg_namespace n ON n.oid = rel.relnamespace
 LEFT JOIN pg_class frel ON frel.oid = con.confrelid
-WHERE n.nspname = %s AND con.contype IN ('p', 'u', 'f')
+WHERE n.nspname = %s AND con.contype IN ('p', 'u', 'f', 'c')
 ORDER BY rel.relname, con.conname
 """
 
@@ -67,6 +68,8 @@ def read_schema(conn: psycopg.Connection, schema: str = "public") -> SchemaSnaps
             t.primary_key = r["cols"]
         elif r["kind"] == "u":
             t.unique_constraints.append(r["cols"])
+        elif r["kind"] == "c":
+            t.check_constraints.append(CheckConstraint(name=r["name"], definition=r["definition"]))
         else:
             t.foreign_keys.append(ForeignKey(name=r["name"], columns=r["cols"],
                                              ref_table=r["ref_table"], ref_columns=r["ref_cols"]))
@@ -91,14 +94,19 @@ def to_prompt_text(snapshot: SchemaSnapshot) -> str:
         rows = f" (~{t.estimated_rows} rows)" if t.estimated_rows is not None else ""
         lines.append(f"\nTABLE {t.name}{rows}")
         for c in t.columns:
-            extra = "" if c.nullable else " NOT NULL"
-            if c.default:
-                extra += f" DEFAULT {c.default}"
-            lines.append(f"  {c.name} {c.data_type}{extra}")
+            kind, default, extra = c.data_type, c.default, "" if c.nullable else " NOT NULL"
+            if default and default.startswith("nextval("):  # an auto-number column: say "bigserial", like a person would
+                kind = {"bigint": "bigserial", "integer": "serial", "smallint": "smallserial"}.get(kind, kind)
+                default, extra = None, ""
+            if default:
+                extra += f" DEFAULT {default}"
+            lines.append(f"  {c.name} {kind}{extra}")
         if t.primary_key:
             lines.append(f"  PRIMARY KEY ({', '.join(t.primary_key)})")
         for u in t.unique_constraints:
             lines.append(f"  UNIQUE ({', '.join(u)})")
+        for ck in t.check_constraints:
+            lines.append(f"  CONSTRAINT {ck.name} {ck.definition}")
         for fk in t.foreign_keys:
             lines.append(f"  FOREIGN KEY ({', '.join(fk.columns)}) -> {fk.ref_table}({', '.join(fk.ref_columns)})")
         for ix in t.indexes:

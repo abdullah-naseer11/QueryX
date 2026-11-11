@@ -19,6 +19,8 @@ Rules:
 - Add FOREIGN KEY or CHECK constraints with NOT VALID.
 - Never use DROP TABLE, DROP DATABASE, TRUNCATE, or DELETE/UPDATE without WHERE.
 - If the request is destructive, unsafe, or not a database change, set "refusal" to a short reason and leave up_sql and down_sql empty.
+- For an auto-numbered id column write: id bigserial PRIMARY KEY. Never write nextval(...) yourself.
+- A migration changes STRUCTURE only. Never use DELETE, UPDATE or INSERT. If the request is to change or remove data rows, set "refusal" (data changes use the backfill tool).
 - Set "irreversible" to true if down_sql cannot bring back lost data.
 
 Example request: Add a nickname column to users

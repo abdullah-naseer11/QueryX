@@ -29,13 +29,27 @@ def rule_truncate(stmt) -> list[RuleResult]:
     return []
 
 
+def _always_true(node) -> bool:
+    """WHERE true, or WHERE 1 = 1: looks like a condition, but matches every row."""
+    if isinstance(node, ast.A_Const) and isinstance(node.val, ast.Boolean):
+        return bool(node.val.boolval)
+    if isinstance(node, ast.A_Expr) and isinstance(node.lexpr, ast.A_Const) and isinstance(node.rexpr, ast.A_Const):
+        op = node.name[0].sval if node.name else ""
+        return op == "=" and node.lexpr.val == node.rexpr.val
+    return False
+
+
 def rule_missing_where(stmt) -> list[RuleResult]:
-    if isinstance(stmt, ast.DeleteStmt) and stmt.whereClause is None:
-        return [_r("delete_without_where", "BLOCK", "DELETE without WHERE removes every row.",
-                   "Add a WHERE condition, and run it in small batches.")]
-    if isinstance(stmt, ast.UpdateStmt) and stmt.whereClause is None:
-        return [_r("update_without_where", "BLOCK", "UPDATE without WHERE changes every row.",
-                   "Add a WHERE condition, and run it in small batches.")]
+    if isinstance(stmt, (ast.DeleteStmt, ast.UpdateStmt)):
+        verb = "DELETE" if isinstance(stmt, ast.DeleteStmt) else "UPDATE"
+        what = "removes" if verb == "DELETE" else "changes"
+        name = verb.lower() + "_without_where"
+        if stmt.whereClause is None:
+            return [_r(name, "BLOCK", f"{verb} without WHERE {what} every row.",
+                       "Add a WHERE condition, and run it in small batches.")]
+        if _always_true(stmt.whereClause):
+            return [_r(name, "BLOCK", f"{verb} with a WHERE that is always true {what} every row.",
+                       "Use a real condition, and run it in small batches.")]
     return []
 
 

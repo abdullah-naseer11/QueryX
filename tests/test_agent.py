@@ -109,3 +109,33 @@ def test_refusal_drops_any_sql_the_ai_wrote_anyway():
     r = propose_migration("drop users", SCHEMA, FakeAI(answer(["DROP TABLE users;"], ["SELECT 1;"], refusal="Destructive")))
     assert r.status == "refused"
     assert r.proposal.up_sql == [] and r.proposal.down_sql == []
+
+
+def test_missing_not_valid_is_sent_back_and_fixed():
+    unsafe = answer([LOCK_SQL, "ALTER TABLE users ADD CONSTRAINT c CHECK (id > 0);"])
+    safe = answer([LOCK_SQL, "ALTER TABLE users ADD CONSTRAINT c CHECK (id > 0) NOT VALID;"])
+    ai = FakeAI(unsafe, safe)
+    r = propose_migration("add check", SCHEMA, ai)
+    assert (r.status, r.attempts, r.report.verdict) == ("ok", 2, "OK")
+    assert "NOT VALID" in ai.asked[1]
+
+
+def test_unfixed_warning_is_still_shown_after_all_tries():
+    unsafe = answer([LOCK_SQL, "CREATE INDEX i ON users (email);"])
+    r = propose_migration("add index", SCHEMA, FakeAI(unsafe, unsafe, unsafe))
+    assert r.status == "ok" and r.attempts == 3 and r.report.verdict == "WARN"
+
+
+def test_data_changes_are_not_migrations():
+    delete = answer(["DELETE FROM users WHERE id > 5;"])
+    ai = FakeAI(delete, delete, delete)
+    r = propose_migration("remove old users", SCHEMA, ai)
+    assert r.status == "refused" and r.proposal.up_sql == [] and "backfill" in r.message
+
+
+def test_data_change_then_proper_refusal():
+    r = propose_migration("remove old users", SCHEMA, FakeAI(answer(["DELETE FROM users WHERE id > 5;"]), answer([], refusal="Data change")))
+    assert r.status == "refused" and r.message == "Data change"
+
+
+LOCK_SQL = "SET lock_timeout = '3s';"
