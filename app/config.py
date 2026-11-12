@@ -15,3 +15,7 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5-coder:3b")
 
 # Sandbox: a throw-away database in Docker, used to test migrations safely.
 SANDBOX_IMAGE = os.getenv("SANDBOX_IMAGE", "postgres:16")
+
+# API. Change API_KEY in .env: every request must send it in the X-API-Key header.
+API_KEY = os.getenv("API_KEY", "dev-key-change-me")
+CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",") if o.strip()]

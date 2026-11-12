@@ -1,4 +1,6 @@
 """Uses real Docker. Skipped automatically if Docker is not running."""
+import os
+
 import docker
 import pytest
 
@@ -6,6 +8,8 @@ from app.sandbox.runner import LABEL, dry_run
 
 
 def docker_is_running() -> bool:
+    if os.getenv("SKIP_DOCKER_TESTS"):
+        return False
     try:
         docker.from_env().ping()
         return True
